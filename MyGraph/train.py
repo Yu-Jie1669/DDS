@@ -97,13 +97,13 @@ def predict(model, device, loader_test, graph_data):
         for step, data in enumerate(loader_test):
             print("Test Step[{}/{}]".format(step + 1, len(loader_test)))
 
-            drug1_ids, drug2_ids, cell_features, labels = data
+            drug1_ids, drug2_ids, cell_ids, labels = data
             drug1_ids = drug1_ids.to(device)
             drug2_ids = drug2_ids.to(device)
             cell_ids = cell_ids.to(device)
             labels = labels.to(device)
 
-            logits = model(drug1_ids, drug2_ids, cell_features, graph_data)
+            logits = model(drug1_ids, drug2_ids, cell_ids, graph_data)
 
             ys = F.softmax(logits, 1).to('cpu').data.numpy()
 
