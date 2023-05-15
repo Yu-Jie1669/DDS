@@ -35,10 +35,10 @@ def get_args(args):
     parser.add_argument("--log_step", type=int, default=20, help="when to accelerator.print log")
 
     # ------------- Data ------------------------
-    parser.add_argument("--data", type=str, default="../../data/DrugCombDB/processed/dataset.pkl")
-    parser.add_argument("--graph", type=str, default="../../data/DrugCombDB/processed/graph.pkl")
+    parser.add_argument("--data", type=str, default="../data/DrugCombDB/processed/dataset.pkl")
+    parser.add_argument("--graph", type=str, default="../data/DrugCombDB/processed/graph.pkl")
 
-    parser.add_argument("--output", type=str, default="../output/", help="output file fold")
+    parser.add_argument("--output", type=str, default="./output/", help="output file fold")
     parser.add_argument("--num_workers", type=int, default=0, help="dataloader num_workers")
 
     # ------------- Model ------------------------
