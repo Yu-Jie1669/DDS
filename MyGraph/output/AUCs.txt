@@ -1,0 +1,30 @@
+data=../../data/DrugCombDB/processed/dataset.pkl
+device=0
+dropout=0.2
+epochs=200
+graph=../../data/DrugCombDB/processed/graph.pkl
+head=1
+hid=768
+log_step=20
+lr=0.001
+model_output=../output/model.model
+num_cell=76
+num_drug=764
+num_layers=1
+num_protein=15970
+num_workers=0
+output=../output/
+result_output=../output/AUCs.txt
+test_batch_size=512
+train_batch_size=512
+valid_batch_size=512
+EmbModel(
+  (drug_emb): Embedding(764, 768)
+  (protein_emb): Embedding(15970, 768)
+  (cell_emb): Embedding(76, 768)
+  (convs): ModuleList(
+    (0): HeteroConv(num_relations=6)
+  )
+  (classifier): Linear(in_features=2304, out_features=2, bias=True)
+)
+Epoch     AUC_dev        PR_AUC         ACC            BACC           PREC           TPR            KAPPA          RECALL         
