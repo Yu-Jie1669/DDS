@@ -103,7 +103,7 @@ def predict(model, device, loader_test, graph_data):
             cell_ids = cell_ids.to(device)
             labels = labels.to(device)
 
-            logits = model(drug1_ids, drug2_ids, cell_ids, graph_data)
+            logits = model(graph_data, drug1_ids, drug2_ids, cell_ids )
 
             ys = F.softmax(logits, 1).to('cpu').data.numpy()
 
