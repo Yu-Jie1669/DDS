@@ -1,6 +1,7 @@
 import torch
 import torch.nn as nn
 from torch_geometric.nn.conv import GATConv, GCNConv, HeteroConv
+import torch.nn.functional as F
 
 
 class EmbModel(nn.Module):
@@ -51,9 +52,9 @@ class EmbModel(nn.Module):
             emb_x_dict = {key: x.relu() for key, x in emb_x_dict.items()}
 
         # [b, d]
-        hid_drug1 = torch.norm(emb_x_dict['drug'][drug1])
-        hid_drug2 = torch.norm(emb_x_dict['drug'][drug2])
-        hid_cell = torch.norm(emb_x_dict['cell'][cell])
+        hid_drug1 = F.normalize(emb_x_dict['drug'][drug1], 2, 0)
+        hid_drug2 = F.normalize(emb_x_dict['drug'][drug2], 2, 0)
+        hid_cell = F.normalize(emb_x_dict['cell'][cell], 2, 0)
 
         hid = torch.cat((hid_drug1, hid_drug2, hid_cell), dim=1)
 
