@@ -206,7 +206,7 @@ def main(args=None):
 
     loss_fn = F.binary_cross_entropy_with_logits
 
-    optimizer = torch.optim.Adam(model.parameters(), lr=args.lr, weight_decay=1e-4, amsgrad=True)
+    optimizer = torch.optim.Adam(model.parameters(), lr=args.lr, weight_decay=100.0, amsgrad=True)
     # 学习率调整器，检测准确率的状态，然后衰减学习率
     scheduler = StepLR(step_size=20, gamma=0.1, optimizer=optimizer)
 
