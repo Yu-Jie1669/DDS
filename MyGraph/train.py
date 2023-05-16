@@ -93,7 +93,7 @@ def val(device, graph_data, loader_val, loss_fn, model, epoch, args, writer):
             print("[Val] {} Epoch[{}/{}] step[{}/{}] loss={}".format(
                 datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S'), epoch + 1, args.epochs, batch_idx + 1, len(loader_val), loss))
     avg_loss = sum(loss_list) / len(loss_list)
-    writer.add_scalar("Validation Loss", avg_loss, epoch)
+    writer.add_scalar("Loss/Validation", avg_loss, epoch)
     print("**********[Val] Epoch[{}/{}]  avg_loss={}".format(
         epoch + 1, args.epochs, avg_loss))
 
@@ -162,7 +162,7 @@ def train(device, graph_data, loader_train, loss_fn, model, optimizer, epoch, ar
             print("[Train] {} Epoch[{}/{}] step[{}/{}] loss={}".format(
                 datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S'), epoch + 1, args.epochs, batch_idx + 1, len(loader_train), loss))
 
-    writer.add_scalar("Training Loss", train_loss / len(loader_train), epoch)
+    writer.add_scalar("Loss/Training", train_loss / len(loader_train), epoch)
 
 
 def main(args=None):
@@ -243,17 +243,24 @@ def main(args=None):
         PR_AUC = metrics.auc(recall, precision)
         BACC = balanced_accuracy_score(T, Y)
         tn, fp, fn, tp = confusion_matrix(T, Y).ravel()
-        TPR = tp / (tp + fn)
+        RECALL = tp / (tp + fn)
         PREC = precision_score(T, Y)
         ACC = accuracy_score(T, Y)
         KAPPA = cohen_kappa_score(T, Y)
         F1 = f1_score(T, Y)
 
+        writer.add_scalar("Metrics/ACC", ACC, epoch)
+        writer.add_scalar("Metrics/PREC", PREC, epoch)
+        writer.add_scalar("Metrics/RECALL", RECALL, epoch)
+        writer.add_scalar("Metrics/AUC_ROC", AUC, epoch)
+        writer.add_scalar("Metrics/AUC_PR", PR_AUC, epoch)
+        writer.add_scalar("Metrics/F1", F1, epoch)
+
         # save data
         if best_auc < AUC:
             best_auc = AUC
             # AUCs = [epoch, AUC, PR_AUC, ACC, BACC, PREC, TPR, KAPPA, recall]
-            AUCs = "%-10d%-15.4f%-15.4f%-15.4f%-15.4f%-15.4f%-15.4f%-15.4f" % (epoch, ACC, PREC, TPR, AUC, PR_AUC, F1, KAPPA)
+            AUCs = "%-10d%-15.4f%-15.4f%-15.4f%-15.4f%-15.4f%-15.4f%-15.4f" % (epoch, ACC, PREC, RECALL, AUC, PR_AUC, F1, KAPPA)
 
             with open(args.result_output, 'a') as f:
                 f.write(AUCs + '\n')
