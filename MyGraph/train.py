@@ -9,7 +9,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 from sklearn import metrics
 from sklearn.metrics import cohen_kappa_score, accuracy_score, roc_auc_score, precision_score, recall_score, \
-    balanced_accuracy_score,f1_score
+    balanced_accuracy_score, f1_score
 from sklearn.metrics import confusion_matrix
 from torch.optim.lr_scheduler import StepLR
 from torch.utils.data import DataLoader, WeightedRandomSampler
@@ -41,6 +41,7 @@ def get_args(args):
     parser.add_argument("--device", type=str, default="0", help="device")
     parser.add_argument("--log_step", type=int, default=20, help="when to accelerator.print log")
     parser.add_argument("--log_dir", type=str, default="./output/logs/")
+    parser.add_argument("--weight_decay", type=float, default=1e-4)
 
     # ------------- Data ------------------------
     parser.add_argument("--data", type=str, default="../data/DrugCombDB/processed/dataset.pkl")
@@ -82,7 +83,7 @@ def val(device, graph_data, loader_val, loss_fn, model, epoch, args, writer):
             cell_ids = cell_ids.to(device)
             labels = labels.to(device)
 
-            if loss_fn ==F.binary_cross_entropy_with_logits:
+            if loss_fn == F.binary_cross_entropy_with_logits:
                 labels = labels.unsqueeze(-1)
                 labels = torch.zeros(labels.shape[0], 2).to(labels).scatter_(-1, labels, 1) * 1.0
 
@@ -206,7 +207,7 @@ def main(args=None):
 
     loss_fn = F.binary_cross_entropy_with_logits
 
-    optimizer = torch.optim.Adam(model.parameters(), lr=args.lr, weight_decay=100.0, amsgrad=True)
+    optimizer = torch.optim.Adam(model.parameters(), lr=args.lr, weight_decay=1e-4, amsgrad=True)
     # 学习率调整器，检测准确率的状态，然后衰减学习率
     scheduler = StepLR(step_size=20, gamma=0.1, optimizer=optimizer)
 
@@ -246,7 +247,7 @@ def main(args=None):
         PREC = precision_score(T, Y)
         ACC = accuracy_score(T, Y)
         KAPPA = cohen_kappa_score(T, Y)
-        F1= f1_score(T,Y)
+        F1 = f1_score(T, Y)
 
         # save data
         if best_auc < AUC:
