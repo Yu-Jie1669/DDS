@@ -1,6 +1,9 @@
 import torch
 import torch.nn as nn
+from torch_geometric.nn import MessagePassing
 from torch_geometric.nn.conv import GATConv, GCNConv, HeteroConv
+from torch_geometric.utils import softmax
+from torch_geometric.nn.inits import glorot, zeros
 import torch.nn.functional as F
 
 
@@ -12,15 +15,25 @@ class EmbModel(nn.Module):
         self.protein_emb = nn.Embedding(args.num_protein, args.hid)
         self.cell_emb = nn.Embedding(args.num_cell, args.hid)
 
+        self.num_layer = args.num_layer
         self.convs = torch.nn.ModuleList()
-        for _ in range(args.num_layers):
+        self.batch_norms = torch.nn.ModuleList()
+
+        self.dropout = args.dropout
+
+        for layer in range(args.num_layer):
+            self.batch_norms.append(torch.nn.BatchNorm1d(args.hid))
+
+        self.GNN = GATConv
+
+        for layer in range(args.num_layer):
             gnn = HeteroConv({
-                ("drug", "d-d", "drug"): GATConv(args.hid, args.hid, args.head),
-                ("drug", "d-p", "protein"): GATConv(args.hid, args.hid, args.head, add_self_loops=False),
-                ("protein", "rev_d-p", "drug"): GATConv(args.hid, args.hid, args.head, add_self_loops=False),
-                ("protein", "p-p", "protein"): GATConv(args.hid, args.hid, args.head),
-                ("cell", "c-p", "protein"): GATConv(args.hid, args.hid, args.head, add_self_loops=False),
-                ("protein", "rev_c-p", "cell"): GATConv(args.hid, args.hid, args.head, add_self_loops=False)
+                ("drug", "d-d", "drug"): self.GNN(args.hid, args.hid, args.head, edge_dim=1),
+                ("drug", "d-p", "protein"): self.GNN(args.hid, args.hid, args.head, add_self_loops=False),
+                ("protein", "rev_d-p", "drug"): self.GNN(args.hid, args.hid, args.head, add_self_loops=False),
+                ("protein", "p-p", "protein"): self.GNN(args.hid, args.hid, args.head),
+                ("cell", "c-p", "protein"): self.GNN(args.hid, args.hid, args.head, add_self_loops=False),
+                ("protein", "rev_c-p", "cell"): self.GNN(args.hid, args.hid, args.head, add_self_loops=False),
             })
             self.convs.append(gnn)
 
@@ -47,9 +60,15 @@ class EmbModel(nn.Module):
             'cell': emb_cells
         }
 
-        for conv in self.convs:
-            emb_x_dict = conv(emb_x_dict, graph.collect("edge_index"), graph.collect("edge_attr"))
-            emb_x_dict = {key: x.relu() for key, x in emb_x_dict.items()}
+        for layer in range(self.num_layer):
+            emb_x_dict = self.convs[layer](emb_x_dict, graph.collect("edge_index"), graph.collect("edge_attr"))
+
+            if layer == self.num_layer - 1:
+                emb_x_dict = {key: F.dropout(self.batch_norms[layer](x), self.dropout, training=self.training)
+                              for key, x in emb_x_dict.items()}
+            else:
+                emb_x_dict = {key: F.dropout(F.relu(self.batch_norms[layer](x)), self.dropout, training=self.training)
+                              for key, x in emb_x_dict.items()}
 
         # [b, d]
         hid_drug1 = F.normalize(emb_x_dict['drug'][drug1], 2, 0)

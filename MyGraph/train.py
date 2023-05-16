@@ -51,7 +51,7 @@ def get_args(args):
     parser.add_argument("--num_workers", type=int, default=0, help="dataloader num_workers")
 
     # ------------- Model ------------------------
-    parser.add_argument("--num_layers", type=int, default=1, help="gnn layer num")
+    parser.add_argument("--num_layer", type=int, default=1, help="gnn layer num")
 
     parser.add_argument("--hid", type=int, default=768, help="hidden channels in model")
 
