@@ -23,7 +23,15 @@ class EmbModel(nn.Module):
             })
             self.convs.append(gnn)
 
-        self.classifier = nn.Linear(3 * args.hid, 2)
+        self.classifier = nn.Sequential(
+            nn.Linear(3 * args.hid, 6 * args.hid),
+            nn.ReLU(),
+            nn.Dropout(args.dropout),
+            nn.Linear(6 * args.hid, 2 * args.hid),
+            nn.ReLU(),
+            nn.Dropout(args.dropout),
+            nn.Linear(2 * args.hid, 2)
+        )
 
     def forward(self, graph, drug1, drug2, cell):
         x_dict = graph.collect("x")
@@ -43,9 +51,9 @@ class EmbModel(nn.Module):
             emb_x_dict = {key: x.relu() for key, x in emb_x_dict.items()}
 
         # [b, d]
-        hid_drug1 = emb_x_dict['drug'][drug1]
-        hid_drug2 = emb_x_dict['drug'][drug2]
-        hid_cell = emb_x_dict['cell'][cell]
+        hid_drug1 = torch.norm(emb_x_dict['drug'][drug1])
+        hid_drug2 = torch.norm(emb_x_dict['drug'][drug2])
+        hid_cell = torch.norm(emb_x_dict['cell'][cell])
 
         hid = torch.cat((hid_drug1, hid_drug2, hid_cell), dim=1)
 
