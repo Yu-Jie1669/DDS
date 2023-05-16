@@ -9,7 +9,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 from sklearn import metrics
 from sklearn.metrics import cohen_kappa_score, accuracy_score, roc_auc_score, precision_score, recall_score, \
-    balanced_accuracy_score
+    balanced_accuracy_score,f1_score
 from sklearn.metrics import confusion_matrix
 from torch.optim.lr_scheduler import StepLR
 from torch.utils.data import DataLoader, WeightedRandomSampler
@@ -20,6 +20,11 @@ from torch.utils.tensorboard import SummaryWriter
 from models.emb_model import EmbModel
 
 torch.set_printoptions(threshold=np.inf)
+
+SEED = 42
+torch.manual_seed(SEED)
+torch.cuda.manual_seed(SEED)
+np.random.seed(SEED)
 
 
 def get_args(args):
@@ -76,6 +81,10 @@ def val(device, graph_data, loader_val, loss_fn, model, epoch, args, writer):
             drug2_ids = drug2_ids.to(device)
             cell_ids = cell_ids.to(device)
             labels = labels.to(device)
+
+            if loss_fn ==F.binary_cross_entropy_with_logits:
+                labels = labels.unsqueeze(-1)
+                labels = torch.zeros(labels.shape[0], 2).to(labels).scatter_(-1, labels, 1) * 1.0
 
             logits = model(graph_data, drug1_ids, drug2_ids, cell_ids)
             loss = loss_fn(logits, labels)
@@ -135,6 +144,10 @@ def train(device, graph_data, loader_train, loss_fn, model, optimizer, epoch, ar
 
         logits = model(graph_data, drug1_ids, drug2_ids, cell_ids)
 
+        if loss_fn == F.binary_cross_entropy_with_logits:
+            labels = labels.unsqueeze(-1)
+            labels = torch.zeros(labels.shape[0], 2).to(labels).scatter_(-1, labels, 1) * 1.0
+
         loss = loss_fn(logits, labels)
         train_loss += loss.item()
         loss.backward()
@@ -191,7 +204,7 @@ def main(args=None):
     # online_model = modeling(args).to(device)
     model = modeling(args).to(device)
 
-    loss_fn = nn.CrossEntropyLoss()
+    loss_fn = F.binary_cross_entropy_with_logits
 
     optimizer = torch.optim.Adam(model.parameters(), lr=args.lr, weight_decay=1e-4, amsgrad=True)
     # 学习率调整器，检测准确率的状态，然后衰减学习率
@@ -200,7 +213,7 @@ def main(args=None):
     print("model:", model)
 
     # ----------- Output Prepare ---------------------------------------------------
-    AUCs = "%-10s%-15s%-15s%-15s%-15s%-15s%-15s%-15s%-15s" % ('Epoch', 'AUC_dev', 'PR_AUC', 'ACC', 'BACC', 'PREC', 'TPR', 'KAPPA', 'RECALL')
+    AUCs = "%-10s%-15s%-15s%-15s%-15s%-15s%-15s%-15s" % ('Epoch', 'ACC', 'PREC', 'RECALL', 'AUC_ROC', 'AUC_PR', 'F1', 'KAPPA')
     # AUCs = 'Epoch\tAUC_dev\tPR_AUC\tACC\tBACC\tPREC\tTPR\tKAPPA\tRECALL'
     with open(args.result_output, 'w') as f:
         for k, v in sorted(vars(args).items()):
@@ -233,13 +246,13 @@ def main(args=None):
         PREC = precision_score(T, Y)
         ACC = accuracy_score(T, Y)
         KAPPA = cohen_kappa_score(T, Y)
-        recall = recall_score(T, Y)
+        F1= f1_score(T,Y)
 
         # save data
         if best_auc < AUC:
             best_auc = AUC
             # AUCs = [epoch, AUC, PR_AUC, ACC, BACC, PREC, TPR, KAPPA, recall]
-            AUCs = "%-10d%-15.8f%-15.8f%-15.8f%-15.8f%-15.8f%-15.8f%-15.8f" % (epoch, AUC, PR_AUC, ACC, BACC, PREC, TPR, KAPPA)
+            AUCs = "%-10d%-15.4f%-15.4f%-15.4f%-15.4f%-15.4f%-15.4f%-15.4f" % (epoch, ACC, PREC, TPR, AUC, PR_AUC, F1, KAPPA)
 
             with open(args.result_output, 'a') as f:
                 f.write(AUCs + '\n')
