@@ -15,6 +15,8 @@ from torch.optim.lr_scheduler import StepLR
 from torch.utils.data import DataLoader, WeightedRandomSampler
 import pickle
 
+from torch.utils.tensorboard import SummaryWriter
+
 from models.emb_model import EmbModel
 
 torch.set_printoptions(threshold=np.inf)
@@ -33,6 +35,7 @@ def get_args(args):
     parser.add_argument("--epochs", type=int, default=200, help="epoch for train")
     parser.add_argument("--device", type=str, default="0", help="device")
     parser.add_argument("--log_step", type=int, default=20, help="when to accelerator.print log")
+    parser.add_argument("--log_dir", type=str, default="./output/logs/")
 
     # ------------- Data ------------------------
     parser.add_argument("--data", type=str, default="../data/DrugCombDB/processed/dataset.pkl")
@@ -52,7 +55,6 @@ def get_args(args):
     parser.add_argument("--num_cell", type=int, default=76)
     parser.add_argument("--head", type=int, default=1)
 
-
     args = parser.parse_args(args)
 
     if not os.path.exists(args.output):
@@ -64,7 +66,7 @@ def get_args(args):
     return args
 
 
-def val(device, graph_data, loader_val, loss_fn, model, epoch, args):
+def val(device, graph_data, loader_val, loss_fn, model, epoch, args, writer):
     model.eval()
     loss_list = []
     with torch.no_grad():
@@ -81,11 +83,12 @@ def val(device, graph_data, loader_val, loss_fn, model, epoch, args):
             print("[Val] {} Epoch[{}/{}] step[{}/{}] loss={}".format(
                 datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S'), epoch + 1, args.epochs, batch_idx + 1, len(loader_val), loss))
     avg_loss = sum(loss_list) / len(loss_list)
+    writer.add_scalar("Validation Loss", avg_loss, epoch)
     print("**********[Val] Epoch[{}/{}]  avg_loss={}".format(
         epoch + 1, args.epochs, avg_loss))
 
 
-def predict(model, device, loader_test, graph_data):
+def predict(model, device, loader_test, graph_data, writer):
     model.eval()
 
     with torch.no_grad():
@@ -103,7 +106,7 @@ def predict(model, device, loader_test, graph_data):
             cell_ids = cell_ids.to(device)
             labels = labels.to(device)
 
-            logits = model(graph_data, drug1_ids, drug2_ids, cell_ids )
+            logits = model(graph_data, drug1_ids, drug2_ids, cell_ids)
 
             ys = F.softmax(logits, 1).to('cpu').data.numpy()
 
@@ -117,8 +120,9 @@ def predict(model, device, loader_test, graph_data):
     return total_labels.numpy().flatten(), total_preds.numpy().flatten(), total_predlabels.numpy().flatten()
 
 
-def train(device, graph_data, loader_train, loss_fn, model, optimizer, epoch, args):
+def train(device, graph_data, loader_train, loss_fn, model, optimizer, epoch, args, writer):
     model.train()
+    train_loss = 0.0
     for batch_idx, data in enumerate(loader_train):
 
         drug1_ids, drug2_ids, cell_ids, labels = data
@@ -132,9 +136,8 @@ def train(device, graph_data, loader_train, loss_fn, model, optimizer, epoch, ar
         logits = model(graph_data, drug1_ids, drug2_ids, cell_ids)
 
         loss = loss_fn(logits, labels)
-
+        train_loss += loss.item()
         loss.backward()
-
         optimizer.step()
 
         # for name, para in model.named_parameters():
@@ -145,9 +148,13 @@ def train(device, graph_data, loader_train, loss_fn, model, optimizer, epoch, ar
             print("[Train] {} Epoch[{}/{}] step[{}/{}] loss={}".format(
                 datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S'), epoch + 1, args.epochs, batch_idx + 1, len(loader_train), loss))
 
+    writer.add_scalar("Training Loss", train_loss / len(loader_train), epoch)
+
 
 def main(args=None):
     args = get_args(args)
+
+    writer = SummaryWriter(args.log_dir)
 
     if torch.cuda.is_available():
         device_index = 'cuda:' + args.device
@@ -207,14 +214,14 @@ def main(args=None):
     epochs = args.epochs
     print('Training begin!')
     for epoch in range(epochs):
-        train(device, graph, loader_train, loss_fn, model, optimizer, epoch, args)
+        train(device, graph, loader_train, loss_fn, model, optimizer, epoch, args, writer)
 
-        val(device, graph, loader_val, loss_fn, model, epoch, args)
+        val(device, graph, loader_val, loss_fn, model, epoch, args, writer)
 
         # T is correct label
         # S is predict score
         # Y is predict label
-        T, S, Y = predict(model, device, loader_test, graph)
+        T, S, Y = predict(model, device, loader_test, graph, writer)
 
         # compute preformence
         AUC = roc_auc_score(T, S)
