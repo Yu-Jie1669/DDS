@@ -1,2 +1,3 @@
 *.pyc
 MyGraph/output/
+MyGraph/output/AUCs.txt
