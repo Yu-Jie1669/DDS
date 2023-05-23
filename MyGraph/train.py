@@ -55,7 +55,7 @@ def get_args(args):
 
     parser.add_argument("--hid", type=int, default=768, help="hidden channels in model")
 
-    parser.add_argument("--dropout", type=float, default=0.2, help="dropout weight")
+    parser.add_argument("--dropout", type=float, default=0.0, help="dropout weight")
     parser.add_argument("--num_drug", type=int, default=764)
     parser.add_argument("--num_protein", type=int, default=15970)
     parser.add_argument("--num_cell", type=int, default=76)
@@ -65,6 +65,9 @@ def get_args(args):
 
     if not os.path.exists(args.output):
         os.mkdir(args.output)
+        print(str(args.output + "/logs"))
+        os.mkdir(str(args.output + "/logs"))
+    args.log_dir=str(args.output + "/logs")
 
     args.model_output = args.output + 'model.model'
     args.result_output = args.output + 'AUCs.txt'
@@ -207,7 +210,7 @@ def main(args=None):
 
     loss_fn = F.binary_cross_entropy_with_logits
 
-    optimizer = torch.optim.Adam(model.parameters(), lr=args.lr, weight_decay=1e-4, amsgrad=True)
+    optimizer = torch.optim.Adam(model.parameters(), lr=args.lr, weight_decay=args.weight_decay, amsgrad=True)
     # 学习率调整器，检测准确率的状态，然后衰减学习率
     scheduler = StepLR(step_size=20, gamma=0.1, optimizer=optimizer)
 
