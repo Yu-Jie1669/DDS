@@ -7,7 +7,7 @@ from torch_geometric.nn.inits import glorot, zeros
 import torch.nn.functional as F
 
 
-class EmbModel(nn.Module):
+class Emb_Split_Model(nn.Module):
     def __init__(self, args):
         super().__init__()
 
@@ -27,15 +27,15 @@ class EmbModel(nn.Module):
         self.GNN = GATConv
 
         for layer in range(args.num_layer):
-            gnn = HeteroConv({
-                ("drug", "d-d", "drug"): self.GNN(args.hid, args.hid, args.head, edge_dim=1, dropout=args.dropout),
-                ("drug", "d-p", "protein"): self.GNN(args.hid, args.hid, args.head, dropout=args.dropout, add_self_loops=False),
-                ("protein", "rev_d-p", "drug"): self.GNN(args.hid, args.hid, args.head, dropout=args.dropout, add_self_loops=False),
-                ("protein", "p-p", "protein"): self.GNN(args.hid, args.hid, args.head, dropout=args.dropout),
-                ("cell", "c-p", "protein"): self.GNN(args.hid, args.hid, args.head, dropout=args.dropout, add_self_loops=False),
-                ("protein", "rev_c-p", "cell"): self.GNN(args.hid, args.hid, args.head, dropout=args.dropout, add_self_loops=False),
-            })
-            self.convs.append(gnn)
+            model_dict = nn.ModuleDict()
+            # model_dict['d-d'] = self.GNN(args.hid, args.hid, args.head, edge_dim=1, dropout=args.dropout)
+            model_dict['d-p'] = self.GNN(args.hid, args.hid, args.head, dropout=args.dropout, add_self_loops=False)
+            model_dict['rev_d-p'] = self.GNN(args.hid, args.hid, args.head, dropout=args.dropout, add_self_loops=False)
+            model_dict['p-p'] =  self.GNN(args.hid, args.hid, args.head, dropout=args.dropout)
+            model_dict['c-p'] = self.GNN(args.hid, args.hid, args.head, dropout=args.dropout, add_self_loops=False)
+            model_dict['rev_c-p'] = self.GNN(args.hid, args.hid, args.head, dropout=args.dropout, add_self_loops=False)
+
+            self.convs.append(model_dict)
 
         self.classifier = nn.Sequential(
             nn.Linear(3 * args.hid, 6 * args.hid),
@@ -61,9 +61,10 @@ class EmbModel(nn.Module):
         }
 
         edge_attr_dict = graph.collect("edge_attr")
-        update_edge_attr_dict = {}
-        for key in edge_attr_dict.keys():
-            update_edge_attr_dict[key] = edge_attr_dict[key]*(-1.0)
+        
+        # update_edge_attr_dict = {}
+        # for key in edge_attr_dict.keys():
+        #     update_edge_attr_dict[key] = edge_attr_dict[key]*(-1.0)
 
         for layer in range(self.num_layer):
             emb_x_dict = self.convs[layer](emb_x_dict, graph.collect("edge_index"), graph.collect("edge_attr"))
