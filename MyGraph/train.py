@@ -18,6 +18,7 @@ import pickle
 from torch.utils.tensorboard import SummaryWriter
 
 from models.emb_model import EmbModel
+from models.emb_split import Emb_Split_Model
 
 torch.set_printoptions(threshold=np.inf)
 
@@ -42,6 +43,8 @@ def get_args(args):
     parser.add_argument("--log_step", type=int, default=20, help="when to accelerator.print log")
     parser.add_argument("--log_dir", type=str, default="./output/logs/")
     parser.add_argument("--weight_decay", type=float, default=1e-4)
+
+    parser.add_argument("--model", type=str, default="emb")
 
     # ------------- Data ------------------------
     parser.add_argument("--data", type=str, default="../data/DrugCombDB/processed/dataset.pkl")
@@ -157,9 +160,9 @@ def train(device, graph_data, loader_train, loss_fn, model, optimizer, epoch, ar
         loss.backward()
         optimizer.step()
 
-        # for name, para in model.named_parameters():
-        #     if para.grad is None:
-        #         print(name)
+        for name, para in model.named_parameters():
+            if para.grad is None:
+                print(name)
 
         if batch_idx % args.log_step == 0:
             print("[Train] {} Epoch[{}/{}] step[{}/{}] loss={}".format(
@@ -204,7 +207,10 @@ def main(args=None):
                              num_workers=args.num_workers, pin_memory=True)
 
     # ----------- Model Prepare ---------------------------------------------------
-    modeling = EmbModel
+    if args.model=="emb":
+        modeling = EmbModel
+    elif args.model == "split":
+        modeling = Emb_Split_Model
     # online_model = modeling(args).to(device)
     model = modeling(args).to(device)
 

@@ -21,18 +21,15 @@ class EmbModel(nn.Module):
 
         self.dropout = args.dropout
 
-        # for layer in range(args.num_layer):
-        #     self.batch_norms.append(torch.nn.BatchNorm1d(args.hid))
-
         self.GNN = GATConv
 
         for layer in range(args.num_layer):
             gnn = HeteroConv({
                 ("drug", "d-d", "drug"): self.GNN(args.hid, args.hid, args.head, edge_dim=1, dropout=args.dropout),
-                ("drug", "d-p", "protein"): self.GNN(args.hid, args.hid, args.head, dropout=args.dropout, add_self_loops=False),
+                # ("drug", "d-p", "protein"): self.GNN(args.hid, args.hid, args.head, dropout=args.dropout, add_self_loops=False),
                 ("protein", "rev_d-p", "drug"): self.GNN(args.hid, args.hid, args.head, dropout=args.dropout, add_self_loops=False),
-                ("protein", "p-p", "protein"): self.GNN(args.hid, args.hid, args.head, dropout=args.dropout),
-                ("cell", "c-p", "protein"): self.GNN(args.hid, args.hid, args.head, dropout=args.dropout, add_self_loops=False),
+                # ("protein", "p-p", "protein"): self.GNN(args.hid, args.hid, args.head, dropout=args.dropout),
+                # ("cell", "c-p", "protein"): self.GNN(args.hid, args.hid, args.head, dropout=args.dropout, add_self_loops=False),
                 ("protein", "rev_c-p", "cell"): self.GNN(args.hid, args.hid, args.head, dropout=args.dropout, add_self_loops=False),
             })
             self.convs.append(gnn)
@@ -60,21 +57,9 @@ class EmbModel(nn.Module):
             'cell': emb_cells
         }
 
-        edge_attr_dict = graph.collect("edge_attr")
-        update_edge_attr_dict = {}
-        for key in edge_attr_dict.keys():
-            update_edge_attr_dict[key] = edge_attr_dict[key]*(-1.0)
-
         for layer in range(self.num_layer):
             emb_x_dict = self.convs[layer](emb_x_dict, graph.collect("edge_index"), graph.collect("edge_attr"))
             emb_x_dict = {key: F.relu(x) for key, x in emb_x_dict.items()}
-
-            # if layer == self.num_layer - 1:
-            #     emb_x_dict = {key: F.dropout(self.batch_norms[layer](x), self.dropout, training=self.training)
-            #                   for key, x in emb_x_dict.items()}
-            # else:
-            #     emb_x_dict = {key: F.dropout(F.relu(self.batch_norms[layer](x)), self.dropout, training=self.training)
-            #                   for key, x in emb_x_dict.items()}
 
         # [b, d]
         hid_drug1 = F.normalize(emb_x_dict['drug'][drug1], 2, 1) 

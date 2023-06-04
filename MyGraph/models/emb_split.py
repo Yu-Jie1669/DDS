@@ -29,10 +29,10 @@ class Emb_Split_Model(nn.Module):
         for layer in range(args.num_layer):
             model_dict = nn.ModuleDict()
             # model_dict['d-d'] = self.GNN(args.hid, args.hid, args.head, edge_dim=1, dropout=args.dropout)
-            model_dict['d-p'] = self.GNN(args.hid, args.hid, args.head, dropout=args.dropout, add_self_loops=False)
+            # model_dict['d-p'] = self.GNN(args.hid, args.hid, args.head, dropout=args.dropout, add_self_loops=False)
             model_dict['rev_d-p'] = self.GNN(args.hid, args.hid, args.head, dropout=args.dropout, add_self_loops=False)
-            model_dict['p-p'] =  self.GNN(args.hid, args.hid, args.head, dropout=args.dropout)
-            model_dict['c-p'] = self.GNN(args.hid, args.hid, args.head, dropout=args.dropout, add_self_loops=False)
+            model_dict['p-p'] =  self.GNN(args.hid, args.hid, args.head, dropout=0.0)
+            # model_dict['c-p'] = self.GNN(args.hid, args.hid, args.head, dropout=args.dropout, add_self_loops=False)
             model_dict['rev_c-p'] = self.GNN(args.hid, args.hid, args.head, dropout=args.dropout, add_self_loops=False)
 
             self.convs.append(model_dict)
@@ -60,22 +60,15 @@ class Emb_Split_Model(nn.Module):
             'cell': emb_cells
         }
 
-        edge_attr_dict = graph.collect("edge_attr")
+        edge_index_dict = graph.collect("edge_index")
         
-        # update_edge_attr_dict = {}
-        # for key in edge_attr_dict.keys():
-        #     update_edge_attr_dict[key] = edge_attr_dict[key]*(-1.0)
 
         for layer in range(self.num_layer):
-            emb_x_dict = self.convs[layer](emb_x_dict, graph.collect("edge_index"), graph.collect("edge_attr"))
-            emb_x_dict = {key: F.relu(x) for key, x in emb_x_dict.items()}
-
-            # if layer == self.num_layer - 1:
-            #     emb_x_dict = {key: F.dropout(self.batch_norms[layer](x), self.dropout, training=self.training)
-            #                   for key, x in emb_x_dict.items()}
-            # else:
-            #     emb_x_dict = {key: F.dropout(F.relu(self.batch_norms[layer](x)), self.dropout, training=self.training)
-            #                   for key, x in emb_x_dict.items()}
+            emb_x_dict['protein'] =  self.convs[layer]['p-p'](emb_x_dict['protein'], edge_index_dict[("protein", "p-p", "protein")])
+            emb_x_dict['protein'] = F.normalize(emb_x_dict['protein'], 2, -1)
+            
+            emb_x_dict['drug'] = F.relu( self.convs[layer]['rev_d-p']((emb_x_dict['protein'], emb_x_dict['drug']), edge_index_dict[("protein", "rev_d-p", "drug")]))
+            emb_x_dict['cell'] = F.relu( self.convs[layer]['rev_c-p']((emb_x_dict['protein'], emb_x_dict['cell']), edge_index_dict[("protein", "rev_c-p", "cell")]))
 
         # [b, d]
         hid_drug1 = F.normalize(emb_x_dict['drug'][drug1], 2, 1) 
