@@ -17,8 +17,8 @@ import pickle
 
 from torch.utils.tensorboard import SummaryWriter
 
-from models.emb_model import EmbModel
-from models.emb_split import Emb_Split_Model
+from models.ae import AEModel
+from models.simple import EmbSplitModel
 
 torch.set_printoptions(threshold=np.inf)
 
@@ -44,7 +44,8 @@ def get_args(args):
     parser.add_argument("--log_dir", type=str, default="./output/logs/")
     parser.add_argument("--weight_decay", type=float, default=1e-4)
 
-    parser.add_argument("--model", type=str, default="emb")
+    parser.add_argument("--model", type=str, default="ae")
+    parser.add_argument("--p_checkpoint", type=str, default="./output/mae/model.model")
 
     # ------------- Data ------------------------
     parser.add_argument("--data", type=str, default="../data/DrugCombDB/processed/dataset.pkl")
@@ -207,12 +208,14 @@ def main(args=None):
                              num_workers=args.num_workers, pin_memory=True)
 
     # ----------- Model Prepare ---------------------------------------------------
-    if args.model=="emb":
-        modeling = EmbModel
-    elif args.model == "split":
-        modeling = Emb_Split_Model
+    if args.model=="ae":
+        modeling = AEModel
+    elif args.model == "simple":
+        modeling = EmbSplitModel
     # online_model = modeling(args).to(device)
     model = modeling(args).to(device)
+
+    model.load_ae()
 
     loss_fn = F.binary_cross_entropy_with_logits
 
